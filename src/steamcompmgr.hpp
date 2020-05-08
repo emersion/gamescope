@@ -3,6 +3,9 @@ extern "C" {
 #endif
 
 #include <stdint.h>
+
+#include <wlr/render/dmabuf.h>
+#include <wlr/types/wlr_buffer.h>
 	
 extern uint32_t currentOutputWidth;
 extern uint32_t currentOutputHeight;
@@ -19,13 +22,11 @@ int steamcompmgr_main(int argc, char **argv);
 #include <mutex>
 #include <vector>
 
-#include <wlr/render/dmabuf.h>
-
 #include <X11/extensions/Xfixes.h>
 
 struct ResListEntry_t {
 	struct wlr_surface *surf;
-	struct wlr_dmabuf_attributes attribs;
+	struct wlr_buffer *buf;
 };
 
 struct _XDisplay;

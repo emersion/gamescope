@@ -16,6 +16,7 @@
 #include "drm.hpp"
 #include "main.hpp"
 #include "vblankmanager.hpp"
+#include "wlserver.h"
 
 #include "gpuvis_trace_utils.h"
 
@@ -190,6 +191,19 @@ static int get_plane_id(struct drm_t *drm)
 	return ret;
 }
 
+static void do_free_fb(struct drm_t *drm, uint32_t fbid)
+{
+	drmModeRmFB( drm->fd, fbid );
+
+	struct wlr_buffer *buf = drm->map_fbid_buf[ fbid ];
+	if ( buf != nullptr )
+	{
+		pthread_mutex_lock(&waylock);
+		wlr_buffer_unlock(buf);
+		pthread_mutex_unlock(&waylock);
+	}
+}
+
 static void page_flip_handler(int fd, unsigned int frame,
 							  unsigned int sec, unsigned int usec, void *data)
 {
@@ -224,7 +238,7 @@ static void page_flip_handler(int fd, unsigned int frame,
 					{
 						printf("deferred free %u\n", previous_fbid);
 					}
-					drmModeRmFB( g_DRM.fd, previous_fbid );
+					do_free_fb( &g_DRM, previous_fbid );
 					
 					g_DRM.fbid_free_queue.erase( g_DRM.fbid_free_queue.begin() + i );
 					break;
@@ -625,7 +639,7 @@ out:
 	return ret;
 }
 
-uint32_t drm_fbid_from_dmabuf( struct drm_t *drm, struct wlr_dmabuf_attributes *dma_buf )
+uint32_t drm_fbid_from_dmabuf( struct drm_t *drm, struct wlr_buffer *buf, struct wlr_dmabuf_attributes *dma_buf )
 {
 	uint32_t ret = 0;
 	uint32_t handles[4] = { 0 };
@@ -641,6 +655,8 @@ uint32_t drm_fbid_from_dmabuf( struct drm_t *drm, struct wlr_dmabuf_attributes *
 
 	drm->map_fbid_inflightflips[ ret ].first = true;
 	drm->map_fbid_inflightflips[ ret ].second = 0;
+
+	drm->map_fbid_buf[ ret ] = buf;
 	
 	return ret;
 }
@@ -656,7 +672,7 @@ void drm_free_fbid( struct drm_t *drm, uint32_t fbid )
 		{
 			printf("free fbid %u\n", fbid);
 		}
-		drmModeRmFB( drm->fd, fbid );
+		do_free_fb( drm, fbid );
 	}
 	else
 	{

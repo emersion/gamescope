@@ -82,6 +82,7 @@ uint64_t maxCommmitID;
 struct commit_t
 {
 	uint32_t fb_id;
+	struct wlr_buffer *buf;
 	VulkanTexture_t vulkanTex;
 	uint64_t commitID;
 	bool done;
@@ -510,29 +511,32 @@ release_commit ( commit_t &commit )
 }
 
 static bool
-import_commit ( struct wlr_dmabuf_attributes *dmabuf, commit_t &commit )
+import_commit ( struct wlr_buffer *buf, commit_t &commit )
 {
-	if ( BIsNested() == False )
+	struct wlr_dmabuf_attributes dmabuf = {};
+	if ( wlr_buffer_get_dmabuf( buf, &dmabuf ) == False )
 	{
-		// We'll also need a copy for Vulkan to consume below.
-
-		int fdCopy = dup( dmabuf->fd[0] );
-
-		if ( fdCopy == -1 )
-		{
-			close( dmabuf->fd[0] );
-			return false;
-		}
-
-		commit.fb_id = drm_fbid_from_dmabuf( &g_DRM, dmabuf );
-		assert( commit.fb_id != 0 );
-
-		close( dmabuf->fd[0] );
-		dmabuf->fd[0] = fdCopy;
+		return false;
 	}
 
-	commit.vulkanTex = vulkan_create_texture_from_dmabuf( dmabuf );
-	assert( commit.vulkanTex != 0 );
+	if ( BIsNested() == False )
+	{
+		commit.fb_id = drm_fbid_from_dmabuf( &g_DRM, buf, &dmabuf );
+		if ( commit.fb_id == 0 )
+		{
+			return false;
+		}
+	} else {
+		pthread_mutex_lock(&waylock);
+		wlr_buffer_unlock(buf);
+		pthread_mutex_unlock(&waylock);
+	}
+
+	commit.vulkanTex = vulkan_create_texture_from_dmabuf( &dmabuf );
+	if ( commit.vulkanTex == 0 )
+	{
+		return false;
+	}
 
 	return true;
 }
@@ -2018,19 +2022,15 @@ void check_new_wayland_res( void )
 	for ( uint32_t i = 0; i < wayland_commit_queue.size(); i++ )
 	{
 		win	*w = find_win( wayland_commit_queue[ i ].surf );
-
-		assert( wayland_commit_queue[ i ].attribs.fd[0] != -1 );
-
 		if ( w == nullptr )
 		{
-			close( wayland_commit_queue[ i ].attribs.fd[0] );
 			fprintf (stderr, "waylandres but no win\n");
 			continue;
 		}
 
 		commit_t newCommit = {};
 
-		bool bSuccess = import_commit( &wayland_commit_queue[ i ].attribs, newCommit );
+		bool bSuccess = import_commit( wayland_commit_queue[ i ].buf, newCommit );
 
 		if ( bSuccess == true )
 		{

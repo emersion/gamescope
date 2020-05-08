@@ -67,10 +67,14 @@ extern struct wlserver_t wlserver;
 #ifndef C_SIDE
 extern "C" {
 #endif
-	
+
+#include <wlr/types/wlr_buffer.h>
+
 extern bool run;
 
 extern int g_nTouchClickMode;
+
+extern pthread_mutex_t waylock;
 
 void xwayland_surface_role_commit(struct wlr_surface *wlr_surface);
 

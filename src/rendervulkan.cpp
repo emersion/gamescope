@@ -1,6 +1,7 @@
 // Initialize Vulkan and composite stuff with a compute queue
 
 #include <stdio.h>
+#include <unistd.h>
 #include <string.h>
 
 #include "rendervulkan.hpp"
@@ -306,6 +307,15 @@ bool CVulkanTexture::BInit( uint32_t width, uint32_t height, VkFormat format, bo
 	
 	if ( pDMA != nullptr )
 	{
+		assert( pDMA->n_planes == 1 );
+
+		// Importing memory from a FD transfers ownership of the FD
+		int fd = dup(pDMA->fd[0]);
+		if ( fd < 0 )
+		{
+			return false;
+		}
+
 		// We're importing WSI buffers from GL or Vulkan, set implicit_sync
 		wsiAllocInfo.sType = VK_STRUCTURE_TYPE_WSI_MEMORY_ALLOCATE_INFO_MESA;
 		wsiAllocInfo.implicit_sync = true;
@@ -316,7 +326,7 @@ bool CVulkanTexture::BInit( uint32_t width, uint32_t height, VkFormat format, bo
 		// Memory already provided by pDMA
 		importMemoryInfo.sType = VK_STRUCTURE_TYPE_IMPORT_MEMORY_FD_INFO_KHR;
 		importMemoryInfo.handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_DMA_BUF_BIT_EXT;
-		importMemoryInfo.fd = pDMA->fd[0];
+		importMemoryInfo.fd = fd;
 		importMemoryInfo.pNext = allocInfo.pNext;
 		
 		allocInfo.pNext = &importMemoryInfo;
@@ -365,7 +375,7 @@ bool CVulkanTexture::BInit( uint32_t width, uint32_t height, VkFormat format, bo
 
 		m_DMA.stride[0] = image_layout.rowPitch;
 		
-		m_FBID = drm_fbid_from_dmabuf( &g_DRM, &m_DMA );
+		m_FBID = drm_fbid_from_dmabuf( &g_DRM, nullptr, &m_DMA );
 		
 		if ( m_FBID == 0 )
 			return false;

@@ -65,6 +65,7 @@ struct drm_t {
 	std::vector < uint32_t > fbids_on_screen;
 	
 	std::unordered_map< uint32_t, std::pair< bool, std::atomic< uint32_t > > > map_fbid_inflightflips;
+	std::unordered_map< uint32_t, struct wlr_buffer * > map_fbid_buf;
 	std::mutex free_queue_lock;
 	std::vector< uint32_t > fbid_free_queue;
 	
@@ -90,7 +91,7 @@ extern bool g_bDebugLayers;
 
 int init_drm(struct drm_t *drm, const char *device, const char *mode_str, unsigned int vrefresh);
 int drm_atomic_commit(struct drm_t *drm, struct Composite_t *pComposite, struct VulkanPipeline_t *pPipeline );
-uint32_t drm_fbid_from_dmabuf( struct drm_t *drm, struct wlr_dmabuf_attributes *dma_buf );
+uint32_t drm_fbid_from_dmabuf( struct drm_t *drm, struct wlr_buffer *buf, struct wlr_dmabuf_attributes *dma_buf );
 void drm_free_fbid( struct drm_t *drm, uint32_t fbid );
 bool drm_can_avoid_composite( struct drm_t *drm, struct Composite_t *pComposite, struct VulkanPipeline_t *pPipeline );
 

@@ -71,21 +71,15 @@ const struct wlr_surface_role xwayland_surface_role;
 
 void xwayland_surface_role_commit(struct wlr_surface *wlr_surface) {
 	assert(wlr_surface->role == &xwayland_surface_role);
-	
-	struct wlr_texture *tex = wlr_surface_get_texture( wlr_surface );
 
-	if ( tex == NULL )
-	{
+	if (wlr_surface->buffer == NULL) {
 		return;
 	}
+
+	struct wlr_buffer *buf = wlr_buffer_lock(&wlr_surface->buffer->base);
 	
 	struct wlr_dmabuf_attributes dmabuf_attribs = {};
-	bool result = False;
-	result = wlr_texture_to_dmabuf( tex, &dmabuf_attribs );
-	
-	assert( result == true );
-	if ( result == false || dmabuf_attribs.fd[0] == -1 )
-	{
+	if (!wlr_buffer_get_dmabuf( buf, &dmabuf_attribs ) || dmabuf_attribs.n_planes != 1) {
 		struct timespec now;
 		clock_gettime(CLOCK_MONOTONIC, &now);
 		
@@ -95,7 +89,7 @@ void xwayland_surface_role_commit(struct wlr_surface *wlr_surface) {
 	
 	gpuvis_trace_printf( "xwayland_surface_role_commit wlr_surface %p\n", wlr_surface );
 	
-	wayland_commit( wlr_surface, &dmabuf_attribs );
+	wayland_commit( wlr_surface, buf );
 }
 
 static void xwayland_surface_role_precommit(struct wlr_surface *wlr_surface) {
