@@ -396,7 +396,7 @@ int wlserver_init(int argc, char **argv, bool bIsNested) {
 
 	wlserver.wlr.compositor = wlr_compositor_create(wlserver.wl_display, wlserver.wlr.renderer);
 	
-	wlserver.wlr.xwayland = wlr_xwayland_create(wlserver.wl_display, wlserver.wlr.compositor, False);
+	wlserver.wlr.xwayland = wlr_xwayland_server_create(wlserver.wl_display, False);
 	
 	const char *socket = wl_display_add_socket_auto(wlserver.wl_display);
 	if (!socket)
@@ -408,7 +408,6 @@ int wlserver_init(int argc, char **argv, bool bIsNested) {
 	
 	wlserver.wlr.seat = wlr_seat_create(wlserver.wl_display, "seat0");
 	wlr_seat_set_capabilities( wlserver.wlr.seat, WL_SEAT_CAPABILITY_POINTER | WL_SEAT_CAPABILITY_KEYBOARD );
-	wlr_xwayland_set_seat(wlserver.wlr.xwayland, wlserver.wlr.seat);
 
 	wlr_log(WLR_INFO, "Running compositor on wayland display '%s'", socket);
 	setenv("_WAYLAND_DISPLAY", socket, true);
@@ -489,7 +488,7 @@ int wlserver_run(void)
 
 	// We need to shutdown Xwayland before disconnecting all clients, otherwise
 	// wlroots will restart it automatically.
-	wlr_xwayland_destroy(wlserver.wlr.xwayland);
+	wlr_xwayland_server_destroy(wlserver.wlr.xwayland);
 	wl_display_destroy_clients(wlserver.wl_display);
 	wl_display_destroy(wlserver.wl_display);
 	return 0;
