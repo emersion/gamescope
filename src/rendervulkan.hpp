@@ -31,8 +31,8 @@ struct Composite_t
 {
 	int nLayerCount;
 	int nSwapChannels;
-	
-	struct
+
+	struct Layer_t
 	{
 		float flScaleX, flScaleY;
 		float flOffsetX, flOffsetY;
@@ -98,6 +98,7 @@ void vulkan_free_texture( VulkanTexture_t vulkanTex );
 
 bool vulkan_composite( struct Composite_t *pComposite, struct VulkanPipeline_t *pPipeline );
 uint32_t vulkan_get_last_composite_fbid( void );
+uint32_t vulkan_get_next_composite_fbid( void );
 
 void vulkan_present_to_window( void );
 

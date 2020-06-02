@@ -69,6 +69,7 @@ struct drm_t {
 	struct liftoff_device *lo_device;
 	struct liftoff_output *lo_output;
 	struct liftoff_layer *lo_layers[ k_nMaxLayers ];
+	struct liftoff_layer *lo_composition_layer;
 
 	/* FBs in the atomic request, but not yet submitted to KMS */
 	std::vector < uint32_t > fbids_in_req;
@@ -85,6 +86,9 @@ struct drm_t {
 	
 	std::atomic < uint64_t > flipcount;
 };
+
+bool drm_prepare( struct drm_t *drm, struct Composite_t *pComposite, struct VulkanPipeline_t *pPipeline, VulkanPipeline_t::LayerBinding_t *compositionLayer, bool *needsComposition );
+
 #endif
 
 #ifndef C_SIDE
@@ -105,7 +109,6 @@ int init_drm(struct drm_t *drm, const char *device, const char *mode_str, unsign
 int drm_atomic_commit(struct drm_t *drm, struct Composite_t *pComposite, struct VulkanPipeline_t *pPipeline );
 uint32_t drm_fbid_from_dmabuf( struct drm_t *drm, struct wlr_dmabuf_attributes *dma_buf );
 void drm_drop_fbid( struct drm_t *drm, uint32_t fbid );
-bool drm_can_avoid_composite( struct drm_t *drm, struct Composite_t *pComposite, struct VulkanPipeline_t *pPipeline );
 
 #ifndef C_SIDE
 }

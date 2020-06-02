@@ -1607,6 +1607,11 @@ uint32_t vulkan_get_last_composite_fbid( void )
 	return g_output.outputImage[ !g_output.nOutImage ].m_FBID;
 }
 
+uint32_t vulkan_get_next_composite_fbid( void )
+{
+	return g_output.outputImage[ g_output.nOutImage ].m_FBID;
+}
+
 uint32_t vulkan_texture_get_fbid( VulkanTexture_t vulkanTex )
 {
 	if ( vulkanTex == 0 )

@@ -1104,14 +1104,26 @@ paint_all(Display *dpy, MouseCursor *cursor)
 	if (drawDebugInfo)
 		paint_debug_info(dpy);
 
+	struct Composite_t identityComposite = {};
+	identityComposite.nLayerCount = 1;
+	identityComposite.layers[ 0 ].flScaleX = 1.0;
+	identityComposite.layers[ 0 ].flScaleY = 1.0;
+	identityComposite.layers[ 0 ].flOpacity = 1.0;
+
+	struct VulkanPipeline_t compositePipeline = {};
+	compositePipeline.layerBindings[ 0 ].surfaceWidth = g_nOutputWidth;
+	compositePipeline.layerBindings[ 0 ].surfaceHeight = g_nOutputHeight;
+	compositePipeline.layerBindings[ 0 ].fbid = vulkan_get_next_composite_fbid();
+	compositePipeline.layerBindings[ 0 ].bFilter = false;
+
 	bool bDoComposite = true;
 
 	if ( BIsNested() == false && alwaysComposite == False )
 	{
-		if ( drm_can_avoid_composite( &g_DRM, &composite, &pipeline ) == true )
-		{
-			bDoComposite = false;
-		}
+		struct Composite_t *drmComposite = alwaysComposite ? &identityComposite : &composite;
+		struct VulkanPipeline_t *drmPipeline = alwaysComposite ? &compositePipeline : &pipeline;
+		bool ok = drm_prepare( &g_DRM, drmComposite, drmPipeline, &compositePipeline.layerBindings[ 0 ], &bDoComposite );
+		assert( ok );
 	}
 
 	if ( bDoComposite == true )
@@ -1129,25 +1141,6 @@ paint_all(Display *dpy, MouseCursor *cursor)
 		}
 		else
 		{
-			memset( &composite, 0, sizeof( composite ) );
-			composite.nLayerCount = 1;
-			composite.layers[ 0 ].flScaleX = 1.0;
-			composite.layers[ 0 ].flScaleY = 1.0;
-			composite.layers[ 0 ].flOpacity = 1.0;
-
-			memset( &pipeline, 0, sizeof( pipeline ) );
-
-			pipeline.layerBindings[ 0 ].surfaceWidth = g_nOutputWidth;
-			pipeline.layerBindings[ 0 ].surfaceHeight = g_nOutputHeight;
-
-			pipeline.layerBindings[ 0 ].fbid = vulkan_get_last_composite_fbid();
-			pipeline.layerBindings[ 0 ].bFilter = false;
-
-			bool bFlip = drm_can_avoid_composite( &g_DRM, &composite, &pipeline );
-
-			// We should always handle a 1-layer flip
-			assert( bFlip == true );
-
 			drm_atomic_commit( &g_DRM, &composite, &pipeline );
 		}
 	}
