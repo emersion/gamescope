@@ -110,6 +110,7 @@ typedef struct _win {
 	Bool isOverlay;
 	Bool isFullscreen;
 	Bool isHidden;
+	Bool isSysTrayIcon;
 	Bool sizeHintsSpecified;
 	unsigned int requestedWidth;
 	unsigned int requestedHeight;
@@ -209,6 +210,7 @@ static Atom		steamUnfocusAtom;
 static Atom		steamTouchClickModeAtom;
 static Atom		utf8StringAtom;
 static Atom		netWMNameAtom;
+static Atom		netSystemTrayOpcodeAtom;
 
 /* opacity property name; sometime soon I'll write up an EWMH spec for it */
 #define OPACITY_PROP		"_NET_WM_WINDOW_OPACITY"
@@ -225,6 +227,10 @@ static Atom		netWMNameAtom;
 #define ICCCM_WITHDRAWN_STATE 0
 #define ICCCM_NORMAL_STATE 1
 #define ICCCM_ICONIC_STATE 3
+
+#define SYSTEM_TRAY_REQUEST_DOCK 0
+#define SYSTEM_TRAY_BEGIN_MESSAGE 1
+#define SYSTEM_TRAY_CANCEL_MESSAGE 2
 
 #define			FRAME_RATE_SAMPLING_PERIOD 160
 
@@ -1240,6 +1246,12 @@ determine_and_apply_focus (Display *dpy, MouseCursor *cursor)
 
 	for (w = list; w; w = w->next)
 	{
+		// Always skip system tray icons
+		if ( w->isSysTrayIcon )
+		{
+			continue;
+		}
+
 		// We allow using an override redirect window in some cases, but if we have
 		// a choice between two windows we always prefer the non-override redirect one.
 		Bool windowIsOverrideRedirect = w->a.override_redirect && !w->ignoreOverrideRedirect;
@@ -1730,6 +1742,7 @@ add_win (Display *dpy, Window id, Window prev, unsigned long sequence)
 	
 	new_win->isFullscreen = False;
 	new_win->isHidden = False;
+	new_win->isSysTrayIcon = False;
 	new_win->sizeHintsSpecified = False;
 	new_win->requestedWidth = 0;
 	new_win->requestedHeight = 0;
@@ -1984,8 +1997,39 @@ handle_net_wm_state(Display *dpy, win *w, XClientMessageEvent *ev)
 }
 
 static void
+handle_system_tray_opcode(Display *dpy, XClientMessageEvent *ev)
+{
+	long opcode = ev->data.l[1];
+
+	switch (opcode) {
+		case SYSTEM_TRAY_REQUEST_DOCK: {
+			Window embed_id = ev->data.l[2];
+
+			/* At this point we're supposed to initiate the XEmbed lifecycle by
+			 * sending XEMBED_EMBEDDED_NOTIFY. However we don't actually need to
+			 * render the systray, we just want to recognize and blacklist these
+			 * icons. So for now do nothing. */
+
+			win *w = find_win(dpy, embed_id);
+			if (w) {
+				w->isSysTrayIcon = True;
+			}
+			break;
+		}
+		default:
+			fprintf(stderr, "Unhandled _NET_SYSTEM_TRAY_OPCODE %ld\n", opcode);
+	}
+}
+
+static void
 handle_client_message(Display *dpy, XClientMessageEvent *ev)
 {
+	if (ev->window == ourWindow && ev->message_type == netSystemTrayOpcodeAtom)
+	{
+		handle_system_tray_opcode( dpy, ev );
+		return;
+	}
+
 	win *w = find_win(dpy, ev->window);
 	if (w)
 	{
@@ -2289,6 +2333,18 @@ register_cm (Display *dpy)
 	return True;
 }
 
+static void
+register_systray(Display *dpy)
+{
+	static char net_system_tray_name[] = "_NET_SYSTEM_TRAY_Sxx";
+
+	snprintf(net_system_tray_name, sizeof(net_system_tray_name),
+			 "_NET_SYSTEM_TRAY_S%d", scr);
+	Atom net_system_tray = XInternAtom(dpy, net_system_tray_name, False);
+
+	XSetSelectionOwner(dpy, net_system_tray, ourWindow, 0);
+}
+
 void handle_done_commits( void )
 {
 	std::lock_guard<std::mutex> lock( listCommitsDoneLock );
@@ -2508,6 +2564,8 @@ steamcompmgr_main (int argc, char **argv)
 		exit (1);
 	}
 
+	register_systray(dpy);
+
 	/* get atoms */
 	steamAtom = XInternAtom (dpy, STEAM_PROP, False);
 	steamUnfocusAtom = XInternAtom (dpy, "STEAM_UNFOCUS", False);
@@ -2538,6 +2596,7 @@ steamcompmgr_main (int argc, char **argv)
 	WMStateAtom = XInternAtom (dpy, "WM_STATE", False);
 	utf8StringAtom = XInternAtom (dpy, "UTF8_STRING", False);
 	netWMNameAtom = XInternAtom (dpy, "_NET_WM_NAME", False);
+	netSystemTrayOpcodeAtom = XInternAtom (dpy, "_NET_SYSTEM_TRAY_OPCODE", False);
 
 	root_width = DisplayWidth (dpy, scr);
 	root_height = DisplayHeight (dpy, scr);
