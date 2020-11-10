@@ -896,7 +896,6 @@ bool drm_prepare( struct drm_t *drm, struct Composite_t *pComposite, struct Vulk
 	if ( 1 || bFirstSwap == true )
 	{
 		flags |= DRM_MODE_ATOMIC_ALLOW_MODESET;
-		bFirstSwap = false;
 	}
 
 	// We do internal refcounting with these events
@@ -922,7 +921,9 @@ bool drm_prepare( struct drm_t *drm, struct Composite_t *pComposite, struct Vulk
 		result = drm_prepare_basic( drm, pComposite, pPipeline );
 	}
 
-	if ( !result ) {
+	if ( result ) {
+		bFirstSwap = false;
+	} else {
 		drmModeAtomicFree( drm->req );
 		drm->req = nullptr;
 
