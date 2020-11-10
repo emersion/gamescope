@@ -717,7 +717,9 @@ void drm_drop_fbid( struct drm_t *drm, uint32_t fbid )
 	}
 }
 
-bool drm_can_avoid_composite( struct drm_t *drm, struct Composite_t *pComposite, struct VulkanPipeline_t *pPipeline )
+/* Prepares an atomic commit for the provided scene-graph. Returns false on
+ * error or if the scene-graph can't be presented directly. */
+bool drm_prepare( struct drm_t *drm, struct Composite_t *pComposite, struct VulkanPipeline_t *pPipeline )
 {
 	int nLayerCount = pComposite->nLayerCount;
 	

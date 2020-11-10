@@ -1207,7 +1207,7 @@ paint_all(Display *dpy, MouseCursor *cursor)
 
 	if ( BIsNested() == false && alwaysComposite == False && takeScreenshot == False )
 	{
-		if ( drm_can_avoid_composite( &g_DRM, &composite, &pipeline ) == true )
+		if ( drm_prepare( &g_DRM, &composite, &pipeline ) == true )
 		{
 			bDoComposite = false;
 		}
@@ -1244,7 +1244,7 @@ paint_all(Display *dpy, MouseCursor *cursor)
 			pipeline.layerBindings[ 0 ].fbid = vulkan_get_last_composite_fbid();
 			pipeline.layerBindings[ 0 ].bFilter = false;
 
-			bool bFlip = drm_can_avoid_composite( &g_DRM, &composite, &pipeline );
+			bool bFlip = drm_prepare( &g_DRM, &composite, &pipeline );
 
 			// We should always handle a 1-layer flip
 			assert( bFlip == true );
