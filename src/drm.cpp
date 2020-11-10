@@ -856,7 +856,7 @@ drm_prepare_liftoff( struct drm_t *drm, struct Composite_t *pComposite, struct V
 		}
 	}
 
-	bool ret = liftoff_output_apply( drm->lo_output, drm->req );
+	bool ret = liftoff_output_apply( drm->lo_output, drm->req, drm->flags );
 
 	int scanoutLayerCount = 0;
 	if ( ret )
