@@ -2137,6 +2137,15 @@ int vulkan_get_texture_fence( VulkanTexture_t vulkanTex )
 	return pTex->m_FD;
 }
 
+static void texture_destroy( struct wlr_texture *wlr_texture )
+{
+	VulkanWlrTexture_t *tex = (VulkanWlrTexture_t *)wlr_texture;
+	delete tex;
+}
+
+static const struct wlr_texture_impl texture_impl = {
+	.destroy = texture_destroy,
+};
 
 static void renderer_begin( struct wlr_renderer *renderer, uint32_t width, uint32_t height )
 {
@@ -2206,10 +2215,14 @@ static const struct wlr_drm_format_set *renderer_get_dmabuf_texture_formats( str
 	return &sampledDRMFormats;
 }
 
-static struct wlr_texture *renderer_texture_from_dmabuf( struct wlr_renderer *wlr_renderer, struct wlr_dmabuf_attributes *dmabuf )
+static struct wlr_texture *renderer_texture_from_dmabuf(
+	struct wlr_renderer *renderer, struct wlr_dmabuf_attributes *dmabuf)
 {
-	VulkanRenderer_t *renderer = (VulkanRenderer_t *) wlr_renderer;
-	return wlr_texture_from_dmabuf( renderer->parent, dmabuf );
+	VulkanWlrTexture_t *tex = new VulkanWlrTexture_t();
+	wlr_texture_init( &tex->base, &texture_impl, dmabuf->width, dmabuf->height );
+	// TODO: check format/modifier
+	// TODO: try importing it into Vulkan
+	return &tex->base;
 }
 
 static bool renderer_resource_is_wl_drm_buffer( struct wlr_renderer *wlr_renderer, struct wl_resource *resource )

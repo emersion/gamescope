@@ -67,6 +67,11 @@ struct VulkanRenderer_t
 	struct wlr_renderer *parent;
 };
 
+struct VulkanWlrTexture_t
+{
+	struct wlr_texture base;
+};
+
 class CVulkanTexture
 {
 public:
