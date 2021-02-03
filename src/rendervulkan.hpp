@@ -70,6 +70,7 @@ struct VulkanRenderer_t
 struct VulkanWlrTexture_t
 {
 	struct wlr_texture base;
+	VulkanTexture_t tex;
 };
 
 class CVulkanTexture
@@ -140,4 +141,6 @@ void vulkan_present_to_window( void );
 void vulkan_garbage_collect( void );
 bool vulkan_remake_swapchain( void );
 
-struct wlr_renderer *vulkan_renderer_create( struct wlr_renderer *parent );
+struct wlr_renderer *vulkan_renderer_create( void );
+
+VulkanTexture_t vulkan_texture_from_wlr( struct wlr_texture *tex );
