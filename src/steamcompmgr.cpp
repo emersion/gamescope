@@ -297,6 +297,16 @@ static bool		useXRes = true;
 std::mutex wayland_commit_lock;
 std::vector<ResListEntry_t> wayland_commit_queue;
 
+struct wlr_buffer_map_entry {
+	struct wl_listener listener;
+	struct wlr_buffer *buf;
+	VulkanTexture_t vulkanTex;
+	uint32_t fb_id;
+};
+
+static std::mutex wlr_buffer_map_lock;
+static std::unordered_map<struct wlr_buffer*, wlr_buffer_map_entry> wlr_buffer_map;
+
 static std::atomic< bool > g_bTakeScreenshot{false};
 
 static int g_nudgePipe[2] = {-1, -1};
@@ -593,41 +603,71 @@ static win * find_win( struct wlr_surface *surf )
 static void
 release_commit( commit_t &commit )
 {
-	if ( commit.fb_id != 0 )
-	{
-		drm_drop_fbid( &g_DRM, commit.fb_id );
-		commit.fb_id = 0;
-	}
-
-	if ( commit.vulkanTex != 0 )
-	{
-		vulkan_free_texture( commit.vulkanTex );
-		commit.vulkanTex = 0;
-	}
+	commit.fb_id = 0;
+	commit.vulkanTex = 0;
 
 	wlserver_lock();
 	wlr_buffer_unlock( commit.buf );
 	wlserver_unlock();
 }
 
+/* This is called from the wlserver thread */
+static void
+handle_wlr_buffer_destroy( struct wl_listener *listener, void *data )
+{
+	std::lock_guard<std::mutex> lock( wlr_buffer_map_lock );
+	wlr_buffer_map_entry *entry = wl_container_of( listener, entry, listener );
+
+	fprintf(stderr, "DESTROY\n");
+
+	if ( entry->fb_id != 0 )
+	{
+		drm_drop_fbid( &g_DRM, entry->fb_id );
+	}
+	if ( entry->vulkanTex != 0 )
+	{
+		// TODO: this isn't thread-safe
+		vulkan_free_texture( entry->vulkanTex );
+	}
+
+	wl_list_remove( &entry->listener.link );
+
+	wlr_buffer_map.erase( wlr_buffer_map.find( entry->buf ) );
+}
+
 static bool
 import_commit ( struct wlr_buffer *buf, commit_t &commit )
 {
+	std::lock_guard<std::mutex> lock( wlr_buffer_map_lock );
+
+	if ( wlr_buffer_map.count( buf ) == 0 )
+	{
+		fprintf(stderr, "IMPORT\n");
+		VulkanTexture_t tex = vulkan_create_texture_from_wlr_buffer( buf );
+		assert( tex != 0 );
+
+		uint32_t fb_id = 0;
+		struct wlr_dmabuf_attributes dmabuf = {0};
+		if ( BIsNested() == false && wlr_buffer_get_dmabuf( buf, &dmabuf ) )
+		{
+			// Failures are expected for buffers which can't be scanned out
+			fb_id = drm_fbid_from_dmabuf( &g_DRM, buf, &dmabuf );
+		}
+
+		struct wlr_buffer_map_entry &entry = wlr_buffer_map[ buf ];
+		entry.buf = buf;
+		entry.vulkanTex = tex;
+		entry.fb_id = fb_id;
+
+		wlserver_lock();
+		entry.listener.notify = handle_wlr_buffer_destroy;
+		wl_signal_add( &buf->events.destroy, &entry.listener );
+		wlserver_unlock();
+	}
+
 	commit.buf = buf;
-
-	commit.vulkanTex = vulkan_create_texture_from_wlr_buffer( buf );
-	assert( commit.vulkanTex != 0 );
-
-	struct wlr_dmabuf_attributes dmabuf = {0};
-	if ( BIsNested() == false && wlr_buffer_get_dmabuf( buf, &dmabuf ) )
-	{
-		commit.fb_id = drm_fbid_from_dmabuf( &g_DRM, buf, &dmabuf );
-	}
-	else
-	{
-		commit.fb_id = 0;
-	}
-
+	commit.vulkanTex = wlr_buffer_map[ buf ].vulkanTex;
+	commit.fb_id = wlr_buffer_map[ buf ].fb_id;
 	return true;
 }
 
